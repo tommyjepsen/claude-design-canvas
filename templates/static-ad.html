@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Static ad starter</title>
+  <meta name="canvas:width" content="1000">
+  <meta name="canvas:height" content="1500">
+  <link rel="stylesheet" href="/brand/tokens.css">
+  <style>
+    html, body { margin: 0; width: 1000px; height: 1500px; overflow: hidden; }
+    .ad {
+      box-sizing: border-box;
+      width: 100%;
+      height: 100%;
+      padding: 88px 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: var(--brand-surface);
+    }
+    .logo { font: 700 40px/1 var(--font-display); letter-spacing: -0.02em; }
+    .headline { margin: 0; font: 700 128px/0.98 var(--font-display); letter-spacing: -0.035em; }
+    .subhead { margin: 32px 0 0; max-width: 700px; font: 400 40px/1.35 var(--font-sans); color: var(--brand-muted); }
+    .hero-visual { height: 520px; border-radius: 32px; background: var(--brand-accent); }
+    .cta {
+      align-self: flex-start;
+      padding: 28px 48px;
+      border-radius: 999px;
+      background: var(--brand-fg);
+      color: var(--brand-bg);
+      font: 600 36px/1 var(--font-sans);
+    }
+  </style>
+</head>
+<body>
+  <main class="ad">
+    <div class="logo" data-section="logo">Spektr</div>
+    <div data-section="copy">
+      <h1 class="headline" data-section="headline">Headline goes here</h1>
+      <p class="subhead" data-section="subhead">One supporting sentence.</p>
+    </div>
+    <div class="hero-visual" data-section="hero-visual"></div>
+    <div class="cta" data-section="cta">Call to action</div>
+  </main>
+</body>
+</html>

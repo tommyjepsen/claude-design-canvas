@@ -1,0 +1,254 @@
+:root {
+  --header-h: 56px; /* keep in sync with HEADER_H in lib/canvas.mjs */
+  --bg: #f3f3f0;
+  --dot: #d2d2cc;
+  --panel: #ffffff;
+  --ink: #17171a;
+  --ink-dim: #77777f;
+  --line: #e0e0da;
+  --accent: #4f6bff;
+  --note: #fff0a0;
+  --note-ink: #2b2500;
+  --mono: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f11;
+    --dot: #2a2a2f;
+    --panel: #1c1c20;
+    --ink: #f1f1f3;
+    --ink-dim: #8e8e97;
+    --line: #2d2d33;
+    --note: #f2df78;
+    --note-ink: #241f00;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.react-flow {
+  --xy-background-color: var(--bg);
+}
+
+/* ---- design node ---- */
+.design {
+  position: relative;
+  outline: 0 solid var(--accent);
+  border-radius: 4px;
+  transition: outline-width 0.12s ease;
+}
+.design.is-selected {
+  outline-width: 6px;
+}
+.design-head {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 26px;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+.design-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.design-size,
+.design-open {
+  color: var(--ink-dim);
+  font-size: 22px;
+}
+.design-size {
+  margin-left: auto;
+  font-family: var(--mono);
+}
+.design-open {
+  text-decoration: none;
+  transition: color 0.12s ease;
+}
+.design-open:hover {
+  color: var(--accent);
+}
+.chip {
+  font: 500 22px/1 var(--mono);
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.design iframe {
+  display: block;
+  border: 0;
+  background: #fff;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.1),
+    0 16px 48px rgba(0, 0, 0, 0.14);
+}
+
+/* ---- note node ---- */
+.note {
+  width: 480px;
+  box-sizing: border-box;
+  padding: 20px 24px;
+  background: var(--note);
+  color: var(--note-ink);
+  border-radius: 12px;
+  outline: 0 solid var(--accent);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.12),
+    0 12px 32px rgba(0, 0, 0, 0.16);
+  transition: outline-width 0.12s ease;
+}
+.note.is-selected {
+  outline-width: 5px;
+}
+.note textarea {
+  display: block;
+  width: 100%;
+  min-height: 1.35em;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: inherit;
+  font: 500 30px/1.35 inherit;
+  field-sizing: content;
+}
+
+/* ---- arrow anchors ---- */
+.react-flow__handle {
+  width: 36px;
+  height: 36px;
+  background: var(--accent);
+  border: 5px solid var(--bg);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle {
+  opacity: 1;
+}
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 6;
+}
+
+.react-flow.mode-note .react-flow__pane {
+  cursor: crosshair;
+}
+
+/* ---- chrome ---- */
+.toolbar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.1);
+}
+.toolbar button {
+  height: 36px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 13px/1 inherit;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+.toolbar button:hover {
+  background: var(--line);
+}
+.toolbar button.active {
+  background: var(--ink);
+  color: var(--bg);
+}
+.toolbar kbd {
+  font: 500 11px/1 var(--mono);
+  opacity: 0.55;
+}
+.toolbar .sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 6px;
+  background: var(--line);
+}
+
+.toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  max-width: 60vw;
+  padding: 10px 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 999px;
+  font: 500 13px/1.2 var(--mono);
+}
+
+.empty {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+  pointer-events: none;
+  color: var(--ink-dim);
+}
+.empty strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+.empty p {
+  max-width: 380px;
+  margin: 8px 0 0;
+  line-height: 1.5;
+}

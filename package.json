@@ -1,0 +1,21 @@
+{
+  "name": "claude-design-canvas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "state": "node scripts/state.mjs",
+    "layout": "node scripts/layout.mjs",
+    "archive": "node scripts/archive.mjs"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.12.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.3.0",
+    "vite": "^8.3.8"
+  }
+}

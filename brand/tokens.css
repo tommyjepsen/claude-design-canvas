@@ -1,0 +1,19 @@
+/* TODO: replace with real brand tokens (see the brand-from-url / brand-from-pdf skills). Designs link this file, so changes apply everywhere. */
+:root {
+  --brand-bg: #ffffff;
+  --brand-fg: #111111;
+  --brand-muted: #6b6b73;
+  --brand-accent: #4f6bff;
+  --brand-surface: #f4f4f6;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sans);
+}
+
+html,
+body {
+  font-family: var(--font-sans);
+  color: var(--brand-fg);
+  background: var(--brand-bg);
+  -webkit-font-smoothing: antialiased;
+}
