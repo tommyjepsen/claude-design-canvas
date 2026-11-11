@@ -2,7 +2,6 @@ import { memo, useContext, useEffect, useRef, useState } from 'react'
 import { CanvasCtx } from '../ctx.js'
 import { attachPicker } from '../pick.js'
 import { copyText } from '../clipboard.js'
-import { Sides } from './Sides.jsx'
 
 function DesignNode({ data, selected }) {
   const { mode, toast } = useContext(CanvasCtx)
@@ -23,7 +22,6 @@ function DesignNode({ data, selected }) {
 
   return (
     <div className={`design${selected ? ' is-selected' : ''}`} style={{ width: data.width }}>
-      <Sides />
       <div className="design-head">
         <span className="design-title">{data.title}</span>
         <button

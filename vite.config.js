@@ -3,35 +3,17 @@ import path from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import {
-  ROOT,
+  BRAND_DIR,
   DESIGNS_DIR,
+  MIME,
+  exportDesign,
   CANVAS_FILE,
+  ROOT,
   scanDesigns,
   readCanvas,
   writeCanvas,
   effectivePositions,
 } from './lib/canvas.mjs'
-
-const BRAND_DIR = path.join(ROOT, 'brand')
-
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.avif': 'image/avif',
-  '.mp4': 'video/mp4',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.ttf': 'font/ttf',
-  '.otf': 'font/otf',
-}
 
 /** Serve a folder as-is (no vite transforms), uncached, so edits show up on the next iframe reload. */
 function serveDir(dir) {
@@ -66,6 +48,15 @@ function canvasPlugin() {
         json(res, 200, { designs, canvas, positions: effectivePositions(designs, canvas.positions) })
       })
 
+      server.middlewares.use('/api/export', (req, res) => {
+        const id = new URL(req.url ?? '', 'http://x').searchParams.get('id') ?? ''
+        const html = exportDesign(id)
+        if (html == null) return json(res, 404, { error: `No design ${id}` })
+        res.setHeader('Content-Type', MIME['.html'])
+        res.setHeader('Content-Disposition', `attachment; filename="${id.replace(/\//g, '-')}.html"`)
+        res.end(html)
+      })
+
       server.middlewares.use('/api/canvas', (req, res) => {
         if (req.method !== 'POST') return json(res, 405, { error: 'POST only' })
         let body = ''
@@ -73,7 +64,7 @@ function canvasPlugin() {
         req.on('end', () => {
           try {
             const c = JSON.parse(body)
-            writeCanvas({ positions: c.positions ?? {}, notes: c.notes ?? [], arrows: c.arrows ?? [] })
+            writeCanvas({ positions: c.positions ?? {}, notes: c.notes ?? [], marks: c.marks ?? [] })
             json(res, 200, { ok: true })
           } catch (e) {
             json(res, 400, { error: String(e) })

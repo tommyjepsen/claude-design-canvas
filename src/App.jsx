@@ -5,10 +5,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  ConnectionMode,
-  MarkerType,
-  addEdge,
-  useEdgesState,
   useNodesState,
   useReactFlow,
 } from '@xyflow/react'
@@ -16,41 +12,37 @@ import '@xyflow/react/dist/style.css'
 import { CanvasCtx } from './ctx.js'
 import { copyText } from './clipboard.js'
 import { Toolbar } from './Toolbar.jsx'
+import { Settings } from './Settings.jsx'
+import { Marks } from './Marks.jsx'
+import { describeAnnotations, headerH } from './annotations.js'
+import { Sidebar } from './Sidebar.jsx'
+import { Highlight } from './Highlight.jsx'
+import { ContextMenu } from './ContextMenu.jsx'
+import { downloadDesign } from './designActions.js'
 import DesignNode from './nodes/DesignNode.jsx'
 import NoteNode from './nodes/NoteNode.jsx'
 
 const nodeTypes = { design: DesignNode, note: NoteNode }
-
-const ACCENT = '#4f6bff'
-const edgeBase = {
-  markerEnd: { type: MarkerType.ArrowClosed, color: ACCENT, width: 7, height: 7 },
-  style: { stroke: ACCENT, strokeWidth: 4 },
-  interactionWidth: 40,
-}
-const toEdge = (a) => ({
-  ...edgeBase,
-  id: a.id,
-  source: a.source,
-  target: a.target,
-  sourceHandle: a.sourceHandle ?? undefined,
-  targetHandle: a.targetHandle ?? undefined,
-})
 
 const uid = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`
 
 function Canvas() {
   const rf = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [highlight, setHighlight] = useState(null)
+  const [menu, setMenu] = useState(null)
+  const rightDown = useRef(null)
+  const [marks, setMarks] = useState([])
+  const [selMarks, setSelMarks] = useState(() => new Set())
   const [mode, setMode] = useState('select')
   const [toastMsg, setToastMsg] = useState(null)
   const [loaded, setLoaded] = useState(false)
   const [dirty, setDirty] = useState(0)
 
   const nodesRef = useRef(nodes)
-  const edgesRef = useRef(edges)
+  const marksRef = useRef(marks)
   nodesRef.current = nodes
-  edgesRef.current = edges
+  marksRef.current = marks
   const lastSaved = useRef('')
   const knownIds = useRef(null)
   const toastTimer = useRef()
@@ -92,8 +84,9 @@ function Canvas() {
     })
 
     if (canvasChanged) {
-      const ids = new Set([...s.designs.map((d) => d.id), ...s.canvas.notes.map((n) => n.id)])
-      setEdges(s.canvas.arrows.filter((a) => ids.has(a.source) && ids.has(a.target)).map(toEdge))
+      history.current.reset = true
+      setMarks(s.canvas.marks)
+      setSelMarks(new Set())
       lastSaved.current = ser
     }
 
@@ -106,7 +99,7 @@ function Canvas() {
       setTimeout(() => rf.fitView({ nodes: all ? undefined : fresh, padding: 0.15, duration: all ? 0 : 600 }), 150)
     }
     setLoaded(true)
-  }, [rf, setNodes, setEdges])
+  }, [rf, setNodes])
 
   useEffect(() => {
     load()
@@ -114,26 +107,66 @@ function Canvas() {
     return () => import.meta.hot?.off('canvas:changed', load)
   }, [load])
 
+  // Everything the user can edit, in the shape canvas.json stores it (also the undo/redo snapshot).
+  const serialize = useCallback(() => {
+    const positions = {}
+    const notes = []
+    for (const n of nodesRef.current) {
+      const x = Math.round(n.position.x)
+      const y = Math.round(n.position.y)
+      if (n.type === 'design') positions[n.id] = { x, y }
+      else notes.push({ id: n.id, x, y, text: n.data.text })
+    }
+    const marks = marksRef.current.map((m) =>
+      Object.fromEntries(Object.entries(m).map(([k, v]) => [k, typeof v === 'number' ? Math.round(v) : v])),
+    )
+    return { positions, notes, marks }
+  }, [])
+
+  // ---- undo / redo: snapshots of serialize(), pushed after each user edit ----
+  const history = useRef({ stack: [], i: -1, t: 0, reset: true })
+  const applying = useRef(false)
+
+  // (Re)start history from whatever was just loaded from disk.
+  useEffect(() => {
+    if (!loaded || !history.current.reset) return
+    history.current = { stack: [JSON.stringify(serialize())], i: 0, t: 0, reset: false }
+  }, [loaded, nodes, marks, serialize])
+
+  useEffect(() => {
+    if (!dirty) return undefined
+    if (applying.current) {
+      applying.current = false
+      return undefined
+    }
+    const timer = setTimeout(() => {
+      const h = history.current
+      const snap = serialize()
+      const str = JSON.stringify(snap)
+      if (h.stack[h.i] === str) return
+      const prev = JSON.parse(h.stack[h.i] ?? 'null')
+      const now = Date.now()
+      // typing in a note: fold keystrokes into one step
+      const onlyText =
+        prev &&
+        JSON.stringify([prev.positions, prev.marks]) === JSON.stringify([snap.positions, snap.marks]) &&
+        prev.notes.length === snap.notes.length &&
+        prev.notes.every((n, j) => n.id === snap.notes[j].id && n.x === snap.notes[j].x && n.y === snap.notes[j].y)
+      h.stack = h.stack.slice(0, h.i + 1)
+      if (onlyText && now - h.t < 1200 && h.i > 0) h.stack[h.i] = str
+      else h.stack.push(str), (h.i = h.stack.length - 1)
+      h.stack = h.stack.slice(-100)
+      h.i = h.stack.length - 1
+      h.t = now
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [dirty, serialize])
+
   // ---- save (debounced; only user edits mark dirty) ----
   useEffect(() => {
     if (!dirty) return undefined
     const t = setTimeout(() => {
-      const positions = {}
-      const notes = []
-      for (const n of nodesRef.current) {
-        const x = Math.round(n.position.x)
-        const y = Math.round(n.position.y)
-        if (n.type === 'design') positions[n.id] = { x, y }
-        else notes.push({ id: n.id, x, y, text: n.data.text })
-      }
-      const arrows = edgesRef.current.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        sourceHandle: e.sourceHandle ?? null,
-        targetHandle: e.targetHandle ?? null,
-      }))
-      const body = JSON.stringify({ positions, notes, arrows })
+      const body = JSON.stringify(serialize())
       lastSaved.current = body
       fetch('/api/canvas', { method: 'POST', headers: { 'content-type': 'application/json' }, body })
     }, 300)
@@ -141,16 +174,9 @@ function Canvas() {
   }, [dirty])
 
   // ---- interactions ----
-  const onConnect = useCallback(
-    (c) => {
-      setEdges((es) => addEdge({ ...edgeBase, ...c, id: uid('arrow') }, es))
-      markDirty()
-    },
-    [setEdges, markDirty],
-  )
-
   const onPaneClick = useCallback(
     (e) => {
+      if (mode === 'select') setSelMarks(new Set())
       if (mode !== 'note') return
       const position = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })
       setNodes((ns) => [...ns, { id: uid('note'), type: 'note', position, data: { text: '', focus: true }, zIndex: 10 }])
@@ -160,22 +186,99 @@ function Canvas() {
   )
 
   const copySelection = useCallback(() => {
-    const sel = nodes.filter((n) => n.selected)
-    const selIds = new Set(sel.map((n) => n.id))
-    const arrows = edges.filter((e) => e.selected || selIds.has(e.source) || selIds.has(e.target))
-    if (!sel.length && !arrows.length) return toast('Select something first')
+    const text = describeAnnotations(marks, nodes, selMarks)
+    if (!text) return toast('Nothing to copy: draw an arrow, rectangle or note first')
+    copyText(text)
+    const n = text.split('\n').length - 1
+    toast(`Copied ${n} annotation${n === 1 ? '' : 's'}`)
+  }, [marks, nodes, selMarks, toast])
 
-    const byId = new Map(nodes.map((n) => [n.id, n]))
-    const label = (id) => {
-      const n = byId.get(id)
-      return n?.type === 'note' ? `note "${n.data.text}"` : id
+  const shareSelected = useCallback(() => {
+    const picked = nodes.filter((n) => n.selected && n.type === 'design')
+    if (!picked.length) return toast('Select a design first')
+    picked.forEach((n, i) =>
+      setTimeout(() => downloadDesign(n.id), i * 300),
+    )
+    toast(picked.length === 1 ? `Downloading ${picked[0].id}.html` : `Downloading ${picked.length} files`)
+  }, [nodes, toast])
+
+  const restore = useCallback(
+    (snap, label) => {
+      setNodes((prev) => [
+        ...prev
+          .filter((n) => n.type === 'design')
+          .map((n) => (snap.positions[n.id] ? { ...n, position: snap.positions[n.id] } : n)),
+        ...snap.notes.map((n) => ({ id: n.id, type: 'note', position: { x: n.x, y: n.y }, data: { text: n.text }, zIndex: 10 })),
+      ])
+      setMarks(snap.marks)
+      setSelMarks(new Set())
+      applying.current = true
+      markDirty()
+      toast(label)
+    },
+    [setNodes, markDirty, toast],
+  )
+
+  const step = useCallback(
+    (dir) => {
+      const h = history.current
+      const next = h.i + dir
+      if (next < 0 || next >= h.stack.length) return toast(dir < 0 ? 'Nothing to undo' : 'Nothing to redo')
+      h.i = next
+      h.t = 0
+      restore(JSON.parse(h.stack[next]), dir < 0 ? 'Undo' : 'Redo')
+    },
+    [restore, toast],
+  )
+
+  // ---- layers sidebar: rect of a design (or one of its elements) in flow coordinates ----
+  const rectOf = useCallback((designId, el) => {
+    const n = nodesRef.current.find((x) => x.id === designId)
+    if (!n) return null
+    const o = { x: n.position.x, y: n.position.y + headerH() }
+    if (!el) return { ...o, w: n.data.width, h: n.data.height }
+    const r = el.getBoundingClientRect()
+    return { x: o.x + r.left, y: o.y + r.top, w: r.width, h: r.height }
+  }, [])
+
+  const focusDesign = useCallback(
+    (id) => {
+      setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })))
+    },
+    [setNodes],
+  )
+
+  const focusLayer = useCallback(
+    (id, layer) => {
+      copyText(layer.ref)
+      toast(`Copied ${layer.ref}`)
+    },
+    [toast],
+  )
+
+  const hoverLayer = useCallback((id, layer) => setHighlight(id ? rectOf(id, layer?.el) : null), [rectOf])
+
+  // Right-click on a design frame. Ignore it when it ended a right-drag pan.
+  useEffect(() => {
+    const down = (e) => {
+      if (e.button === 2) rightDown.current = { x: e.clientX, y: e.clientY }
     }
-    const lines = ['Canvas selection:']
-    for (const n of sel) lines.push(n.type === 'note' ? `- Note: "${n.data.text}"` : `- Design: ${n.id} ("${n.data.title}")`)
-    for (const e of arrows) lines.push(`- Arrow: ${label(e.source)} -> ${label(e.target)}`)
-    copyText(lines.join('\n'))
-    toast(`Copied ${lines.length - 1} item${lines.length === 2 ? '' : 's'}`)
-  }, [nodes, edges, toast])
+    window.addEventListener('pointerdown', down, true)
+    return () => window.removeEventListener('pointerdown', down, true)
+  }, [])
+
+  const onNodeContextMenu = useCallback(
+    (e, node) => {
+      if (node.type !== 'design') return
+      e.preventDefault()
+      const d = rightDown.current
+      if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return
+      setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === node.id })))
+      setMenu({ x: e.clientX, y: e.clientY, node })
+    },
+    [setNodes],
+  )
+  const closeMenu = useCallback(() => setMenu(null), [])
 
   const fit = useCallback(() => rf.fitView({ padding: 0.12, duration: 400 }), [rf])
 
@@ -183,22 +286,37 @@ function Canvas() {
     const onKey = (e) => {
       const t = e.target
       if (t.isContentEditable || ['INPUT', 'TEXTAREA'].includes(t.tagName)) return
-      if (e.metaKey || e.ctrlKey || e.altKey) return
       const k = e.key.toLowerCase()
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && (k === 'z' || k === 'y')) {
+        e.preventDefault()
+        step(k === 'y' || e.shiftKey ? 1 : -1)
+        return
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return
       if (k === 'v') setMode('select')
       else if (k === 'p') setMode('pick')
       else if (k === 'n') setMode('note')
+      else if (k === 'a') setMode('arrow')
+      else if (k === 'r') setMode('rect')
       else if (k === 'i') setMode('interact')
+      else if (k === 'l') document.querySelector('.side-btn, .side-head button')?.click()
       else if (k === 'f') fit()
       else if (k === 'c') copySelection()
-      else if (k === 'escape') {
+      else if (k === 's') shareSelected()
+      else if (k === 'backspace' || k === 'delete') {
+        if (!selMarks.size) return
+        setMarks((ms) => ms.filter((m) => !selMarks.has(m.id)))
+        setSelMarks(new Set())
+        markDirty()
+      } else if (k === 'escape') {
         setMode('select')
+        setSelMarks(new Set())
         setNodes((ns) => ns.map((n) => (n.selected ? { ...n, selected: false } : n)))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [fit, copySelection, setNodes])
+  }, [fit, copySelection, shareSelected, step, setNodes, selMarks, markDirty])
 
   const ctx = useMemo(() => ({ mode, toast, markDirty }), [mode, toast, markDirty])
   const empty = loaded && !nodes.some((n) => n.type === 'design')
@@ -208,32 +326,34 @@ function Canvas() {
       <ReactFlow
         className={`mode-${mode}`}
         nodes={nodes}
-        edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
         onPaneClick={onPaneClick}
+        onNodeContextMenu={onNodeContextMenu}
+        onMoveStart={closeMenu}
         onNodeDragStop={markDirty}
         onNodesDelete={markDirty}
-        onEdgesDelete={markDirty}
-        connectionMode={ConnectionMode.Loose}
         colorMode="system"
         minZoom={0.03}
         maxZoom={2}
         panOnScroll
         zoomOnScroll={false}
         zoomOnDoubleClick={false}
-        selectionOnDrag
+        selectionOnDrag={mode !== 'arrow' && mode !== 'rect'}
         panOnDrag={[1, 2]}
         deleteKeyCode={['Backspace', 'Delete']}
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={80} size={4} color="var(--dot)" />
-        <Controls showInteractive={false} />
+        <Controls position="bottom-right" showInteractive={false} />
+        <Highlight rect={highlight} />
+        <Marks mode={mode} marks={marks} setMarks={setMarks} selected={selMarks} setSelected={setSelMarks} markDirty={markDirty} />
       </ReactFlow>
 
-      <Toolbar mode={mode} setMode={setMode} onFit={fit} onCopy={copySelection} />
+      <Sidebar nodes={nodes} onFocusDesign={focusDesign} onFocusLayer={focusLayer} onHover={hoverLayer} />
+      {menu && <ContextMenu menu={menu} onClose={closeMenu} toast={toast} />}
+      <Settings />
+      <Toolbar mode={mode} setMode={setMode} onFit={fit} onCopy={copySelection} onShare={shareSelected} />
       {toastMsg && <div className="toast">{toastMsg}</div>}
       {empty && (
         <div className="empty">

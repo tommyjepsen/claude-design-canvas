@@ -1,7 +1,6 @@
 import { memo, useContext, useEffect, useRef } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { CanvasCtx } from '../ctx.js'
-import { Sides } from './Sides.jsx'
 
 function NoteNode({ id, data, selected }) {
   const { setNodes } = useReactFlow()
@@ -14,7 +13,6 @@ function NoteNode({ id, data, selected }) {
 
   return (
     <div className={`note${selected ? ' is-selected' : ''}`}>
-      <Sides />
       <textarea
         ref={field}
         className="nodrag nowheel"

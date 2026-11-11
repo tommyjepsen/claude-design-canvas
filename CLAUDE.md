@@ -94,12 +94,18 @@ The user draws on the canvas; it is saved to `canvas.json`. Run:
 npm run state
 ```
 
-It lists designs with positions, the user's notes, and arrows. How to read them:
+It lists designs with positions, the user's notes, and marks. Marks are free-form annotations drawn anywhere on the
+canvas (no connections to nodes): **arrows** point at the exact spot to change, **rectangles** highlight an area (a spacing
+difference, a misaligned block, a region to rework). Coordinates are design pixels from the top-left of that design.
+How to read them:
 
-- A **note with an arrow to a design** is feedback on that design ("make the headline bigger" -> apply to that file).
+- An **arrow** whose head lands on a design: change what is at that point. A **note at the arrow's tail** says what to change.
+- A **rectangle**: the region in question. Read nearby notes for the instruction; for spacing, measure against the
+  sections it overlaps / sits next to.
 - A **note with no arrow** is general direction for the whole set.
-- An **arrow between two designs** means "relate these" (combine, or derive one from the other), read the nearby
-  notes for what.
+- An **arrow from one design to another** means "relate these" (combine, or derive one from the other).
+
+The canvas's "Copy annotations" (key `C`) resolves marks to `data-section` names for you, so a pasted block is more precise than `npm run state`.
 
 Prompts will also contain refs pasted from the canvas:
 
@@ -108,12 +114,12 @@ Prompts will also contain refs pasted from the canvas:
 | `pinterest-ads/v2` | the whole design (file `designs/pinterest-ads/v2.html`) |
 | `pinterest-ads/v2#headline` | the element with `data-section="headline"` (or `id="headline"`) in that file |
 | `pinterest-ads/v2 :: main > div:nth-of-type(2)` | CSS path, when the element had no section/id |
-| `Canvas selection:` block | output of "Copy selection": designs, notes and arrows the user selected |
+| `Canvas annotations` block | output of "Copy" (`C`): the arrows, rectangles, notes and designs the user selected, resolved to sections |
 
 Text in parentheses after a ref is just the element's text, for orientation.
 
 When you edit `canvas.json` yourself, re-read it first: the user's browser writes to it too. Never delete the user's
-notes or arrows unless asked.
+notes or marks unless asked.
 
 ## Housekeeping
 
